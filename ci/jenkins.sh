@@ -44,6 +44,7 @@ git -C ${REPOSITORY} fetch origin ${GIT_PREVIOUS_COMMIT}
 echo "Comparing ${GIT_PREVIOUS_COMMIT} (before) with ${GIT_COMMIT} (after)"
 
 rm -rf ${WORKSPACE}/build
+git -C ${REPOSITORY} worktree prune
 
 if [[ $(du -sm ${WORKSPACE}/install | cut -f1) -gt 50000 ]]; then
 	find ${WORKSPACE}/install -maxdepth 1 -not -mtime -7 -exec rm -rf {} \;
@@ -124,8 +125,10 @@ for VERSION in ${GIT_PREVIOUS_COMMIT} ${GIT_COMMIT}; do
 	cmake -S ${SOURCE_DIR} -B ${BINARY_DIR} "${BUILD_OPTIONS[@]}"
 	cmake --build ${BINARY_DIR} --parallel $(($(nproc) - 2)) --target install
 
-	(cd ${BINARY_DIR} && ctest -VV)
+	(cd ${BINARY_DIR} && ctest -VV -R record)
 done
+
+(cd ${BINARY_DIR} && ctest -VV -R report)
 
 for VERSION in ${GIT_PREVIOUS_COMMIT} ${GIT_COMMIT}; do
 	SHA=$(git -C ${REPOSITORY} rev-parse --short $VERSION)
@@ -133,5 +136,6 @@ for VERSION in ${GIT_PREVIOUS_COMMIT} ${GIT_COMMIT}; do
 	git -C ${REPOSITORY} worktree remove ${SOURCE_DIR}
 done
 
-sed -i "1s@^@Comparing ${GIT_PREVIOUS_COMMIT} (before) with ${GIT_COMMIT} (after)\n\n@" \
-	${WORKSPACE}/build/g4run/perf/pythia.txt
+sed -i -e "s/@before@/${GIT_PREVIOUS_COMMIT}/" \
+       -e "s/@after@/${GIT_COMMIT}/" ${WORKSPACE}/build/g4run/perf/html/index.html
+sed -i -e "s/@after@/${GIT_COMMIT}/" ${WORKSPACE}/build/g4run/perf/html/metrics.html
